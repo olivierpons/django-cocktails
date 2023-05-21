@@ -28,12 +28,15 @@ from django.db.models.functions import (
     Trunc,
 )
 from django.forms import IntegerField, DateField
+from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, UpdateView
 from rest_framework import viewsets
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .forms import CocktailForm
 from .models import Cocktail, CocktailIngredient
 from .serializers.cocktail import CocktailSerializer
 
@@ -246,7 +249,7 @@ class CocktailViewSet(viewsets.ModelViewSet):
     serializer_class = CocktailSerializer
 
 
-class CocktailSearchView(APIView):
+class CocktailListByIngredientView(APIView):
     @staticmethod
     def get(request):
         ingredient_part = request.query_params.get("ingredient", None)
@@ -265,3 +268,22 @@ class CocktailSearchView(APIView):
             return Response(
                 {"message": _("Please provide an ingredient name.")}
             )
+
+
+class CocktailListByTitleView(ListAPIView):
+    serializer_class = CocktailSerializer
+
+    def get_queryset(self):
+        title = self.kwargs['title']
+        return Cocktail.objects.filter(title__icontains=title)
+
+
+class CocktailUpdateView(UpdateView):
+    model = Cocktail
+    form_class = CocktailForm
+    template_name = 'cocktail_update.html'
+    success_url = '/'
+
+    def form_valid(self, form):
+        form.instance.updated_by = self.request.user
+        return super().form_valid(form)
