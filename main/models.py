@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from datetime import datetime
 
@@ -64,9 +65,13 @@ class TimeStampedModel(models.Model):
         return self.get_time_difference(date, now)
 
 
+def _path(instance, filename):
+    return '{}/{}'.format(timezone.now().strftime('%Y-%m-%d'), filename)
+
+
 class Image(TimeStampedModel):
-    image = models.ImageField(upload_to="images/")
-    title = models.CharField(max_length=200, blank=True)
+    file = models.ImageField(upload_to=_path, default=None, null=True, blank=True)
+    title = models.CharField(max_length=200, default=None, null=True, blank=True)
 
     def __str__(self):
         return self.title

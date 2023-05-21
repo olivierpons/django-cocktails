@@ -2,11 +2,7 @@ import argparse
 import requests
 from bs4 import BeautifulSoup
 
-login_url = "http://127.0.0.1:8000/login/"
-
-parser = argparse.ArgumentParser(
-    description="Upload an image for a given cocktail."
-)
+parser = argparse.ArgumentParser()
 parser.add_argument("-t", "--title", required=True)
 parser.add_argument("-f", "--file", required=True)
 parser.add_argument("-u", "--username", required=True)
@@ -15,25 +11,33 @@ args = parser.parse_args()
 
 login_data = {"username": args.username, "password": args.password}
 server = "http://127.0.0.1:8000"
+
 with requests.Session() as s:
-    s.get(login_url)
+    s.get(server + "/admin/login/")
     login_data["csrfmiddlewaretoken"] = s.cookies["csrftoken"]
-    s.post(login_url, data=login_data)
+    s.post(server + "/admin/login/", data=login_data)
     cocktail_url = f"{server}/cocktails-by-title/{args.title}/"
     cocktail = s.get(cocktail_url).json()
 
     if cocktail:
         update_url = f'{server}/cocktail-update/{cocktail[0]["pk"]}/'
+        update_form_page = s.get(update_url)
+        soup = BeautifulSoup(update_form_page.text, "html.parser")
+        csrf_token = soup.find("input", {"name": "csrfmiddlewaretoken"})[
+            "value"
+        ]
         form_data = {
             "title": args.title,
-            "csrfmiddlewaretoken": s.cookies["csrftoken"],
+            "image_title": args.title,
+            "csrfmiddlewaretoken": csrf_token
         }
-        file_data = {"image": open(args.file, "rb")}
-        r = s.post(update_url, data=form_data, files=file_data)
+        with open(args.file, "rb") as img_file:
+            file_data = {"image": img_file}
+            r = s.post(update_url, data=form_data, files=file_data)
 
         if r.status_code == 200:
-            print("Cocktail mis à jour avec succès.")
+            print(f"Cocktail '{args.title}' updated!")
         else:
-            print("Erreur lors de la mise à jour du cocktail.")
+            print(f"Error updating cocktail '{args.title}'.")
     else:
-        print("Aucun cocktail trouvé avec ce titre.")
+        print(f"No cocktail found with the title '{args.title}'")

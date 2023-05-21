@@ -36,7 +36,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .forms import CocktailForm
+from .forms import CocktailForm, ImageForm
 from .models import Cocktail, CocktailIngredient
 from .serializers.cocktail import CocktailSerializer
 
@@ -284,6 +284,19 @@ class CocktailUpdateView(UpdateView):
     template_name = 'cocktail_update.html'
     success_url = '/'
 
+    def form_invalid(self, form):
+        return super().form_invalid(form)
+
     def form_valid(self, form):
-        form.instance.updated_by = self.request.user
+        image_form = ImageForm({
+            'created_by': self.request.user,
+            'updated_by': self.request.user,
+            'title': self.request.POST.get('image_title'),
+            'file': self.request.FILES.get('image')
+        })
+
+        if image_form.is_valid():
+            image = image_form.save()
+            self.object.images.add(image)
+
         return super().form_valid(form)
