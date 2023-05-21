@@ -282,7 +282,7 @@ class CocktailUpdateView(UpdateView):
     model = Cocktail
     form_class = CocktailForm
     template_name = 'cocktail_update.html'
-    success_url = '/'
+    success_url = '/drf/'
 
     def form_invalid(self, form):
         return super().form_invalid(form)
@@ -292,8 +292,7 @@ class CocktailUpdateView(UpdateView):
             'created_by': self.request.user,
             'updated_by': self.request.user,
             'title': self.request.POST.get('image_title'),
-            'file': self.request.FILES.get('image')
-        })
+        }, self.request.FILES)
 
         if image_form.is_valid():
             image = image_form.save()

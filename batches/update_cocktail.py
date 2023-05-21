@@ -32,7 +32,7 @@ with requests.Session() as s:
             "csrfmiddlewaretoken": csrf_token
         }
         with open(args.file, "rb") as img_file:
-            file_data = {"image": img_file}
+            file_data = {"file": img_file}
             r = s.post(update_url, data=form_data, files=file_data)
 
         if r.status_code == 200:
