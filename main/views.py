@@ -7,7 +7,6 @@ from django.db.models import (
     Avg,
     ExpressionWrapper,
     F,
-    Variance,
     Case,
     When,
     Exists,
@@ -15,7 +14,6 @@ from django.db.models import (
 from django.db.models import FloatField
 from django.db.models import Subquery, OuterRef, Window
 from django.db.models import Value
-from django.db.models.aggregates import Aggregate
 from django.db.models.functions import Now, ExtractYear, TruncDate
 from django.db.models.functions import (
     RowNumber,
@@ -25,10 +23,8 @@ from django.db.models.functions import (
     Length,
     Coalesce,
     Concat,
-    Trunc,
 )
-from django.forms import IntegerField, DateField
-from django.shortcuts import get_object_or_404
+from django.forms import IntegerField
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView, UpdateView
 from rest_framework import viewsets
@@ -37,8 +33,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .forms import CocktailForm, ImageForm
-from .models import Cocktail, CocktailIngredient
+from .models import Cocktail, CocktailIngredient, Tag
 from .serializers.cocktail import CocktailSerializer
+from .serializers.cocktail_ingredient_count import IngredientCountSerializer
 
 
 class IndexView(TemplateView):
@@ -46,7 +43,8 @@ class IndexView(TemplateView):
 
     def get_context_data(self, **kwargs):
         result = super().get_context_data(**kwargs)
-        # Calculer le nombre total de cocktails et la moyenne des ingrédients par cocktail
+        # Calculer le nombre total de cocktails et la moyenne des ingredients
+        # par cocktail :
         aggregated_data = Cocktail.objects.aggregate(
             total_cocktails=Count("id", distinct=True),
             avg_ingredients=Avg("ingredients__quantity__value"),
@@ -209,7 +207,7 @@ class IndexView(TemplateView):
         # This will truncate a cocktail's creation date to the date (without time).
         # Annotate each cocktail with its creation date (without time)
         cocktails = Cocktail.objects.annotate(
-            creation_date=TruncDate('created_at')
+            creation_date=TruncDate("created_at")
         )
 
         # Now you can access 'creation_date' for each cocktail
@@ -218,7 +216,7 @@ class IndexView(TemplateView):
 
         # Annotate each cocktail with its creation year
         cocktails = Cocktail.objects.annotate(
-            creation_year=ExtractYear('created_at')
+            creation_year=ExtractYear("created_at")
         )
 
         # Now you can access 'creation_year' for each cocktail
@@ -227,19 +225,18 @@ class IndexView(TemplateView):
 
         # Expression to calculate the age of the cocktail in days
         age_expression = ExpressionWrapper(
-            Now() - F('created_at'),
-            output_field=models.DurationField()
+            Now() - F("created_at"), output_field=models.DurationField()
         )
 
         # Annotate each cocktail with its age
-        cocktails = Cocktail.objects.annotate(
-            age=age_expression
-        )
+        cocktails = Cocktail.objects.annotate(age=age_expression)
 
         # Now you can access 'age' for each cocktail
         for cocktail in cocktails:
             # The age is a timedelta object, to get the number of days you can use .days
-            print(f"The cocktail {cocktail.title} is {cocktail.age.days} days old.")
+            print(
+                f"The cocktail {cocktail.title} is {cocktail.age.days} days old."
+            )
 
         return result
 
@@ -247,6 +244,40 @@ class IndexView(TemplateView):
 class CocktailViewSet(viewsets.ModelViewSet):
     queryset = Cocktail.objects.all()
     serializer_class = CocktailSerializer
+
+
+class CocktailListByTitleView(ListAPIView):
+    serializer_class = CocktailSerializer
+
+    def get_queryset(self):
+        title = self.kwargs["title"]
+        return Cocktail.objects.filter(title__icontains=title)
+
+
+class CocktailUpdateView(UpdateView):
+    model = Cocktail
+    form_class = CocktailForm
+    template_name = "cocktail_update.html"
+    success_url = "/drf/"
+
+    def form_invalid(self, form):
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        image_form = ImageForm(
+            {
+                "created_by": self.request.user,
+                "updated_by": self.request.user,
+                "title": self.request.POST.get("image_title"),
+            },
+            self.request.FILES,
+        )
+
+        if image_form.is_valid():
+            image = image_form.save()
+            self.object.images.add(image)
+
+        return super().form_valid(form)
 
 
 class CocktailListByIngredientView(APIView):
@@ -270,32 +301,45 @@ class CocktailListByIngredientView(APIView):
             )
 
 
-class CocktailListByTitleView(ListAPIView):
+class CocktailsByIngredientCountView(ListAPIView):
     serializer_class = CocktailSerializer
 
     def get_queryset(self):
-        title = self.kwargs['title']
-        return Cocktail.objects.filter(title__icontains=title)
+        ingredient_count = int(self.kwargs["count"])
+        cocktails = Cocktail.objects.annotate(
+            ingredient_count=Count("ingredients")
+        ).filter(ingredient_count=ingredient_count)
+        return cocktails
 
 
-class CocktailUpdateView(UpdateView):
-    model = Cocktail
-    form_class = CocktailForm
-    template_name = 'cocktail_update.html'
-    success_url = '/drf/'
+class CocktailsByTagView(ListAPIView):
+    serializer_class = CocktailSerializer
 
-    def form_invalid(self, form):
-        return super().form_invalid(form)
+    def get_queryset(self):
+        tag_name = self.kwargs["tag"]
+        tag = Tag.objects.get(name=tag_name)
+        return Cocktail.objects.filter(tags=tag)
 
-    def form_valid(self, form):
-        image_form = ImageForm({
-            'created_by': self.request.user,
-            'updated_by': self.request.user,
-            'title': self.request.POST.get('image_title'),
-        }, self.request.FILES)
 
-        if image_form.is_valid():
-            image = image_form.save()
-            self.object.images.add(image)
+class CocktailWithTagAndMinIngredientsView(ListAPIView):
+    serializer_class = CocktailSerializer
 
-        return super().form_valid(form)
+    def get_queryset(self):
+        tag_name = self.kwargs["tag"]
+        min_ingredients = int(self.kwargs["min"])
+        tag = Tag.objects.get(name=tag_name)
+        cocktails = Cocktail.objects.annotate(
+            ingredient_count=Count("ingredients")
+        ).filter(ingredient_count__gte=min_ingredients, tags=tag)
+        return cocktails
+
+
+class CocktailIngredientCountView(APIView):
+    def get(self, request):
+        data = (
+            CocktailIngredient.objects.values("ingredient__name_singular")
+            .annotate(count=Count("cocktail"))
+            .order_by("-count")
+        )
+        serializer = IngredientCountSerializer(data, many=True)
+        return Response(serializer.data)
