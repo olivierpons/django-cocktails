@@ -1,17 +1,24 @@
 from django.contrib import admin
 
-from main.models import Image, Tag, Ingredient, Unit, Cocktail, \
-    CocktailIngredient, Quantity
+from main.models import (
+    Image,
+    Tag,
+    Ingredient,
+    Unit,
+    Cocktail,
+    CocktailIngredient,
+    Quantity,
+)
 
 
-class CocktailIngredientInlineAdmin(admin.StackedInline):
+class CocktailIngredientInlineAdmin(admin.TabularInline):
     model = CocktailIngredient
     extra = 0
 
 
 class CocktailAdmin(admin.ModelAdmin):
-    search_fields = ('title', )
-    fields = ('title',)
+    search_fields = ("title",)
+    fields = ("title",)
     inlines = (CocktailIngredientInlineAdmin,)
     list_per_page = 500
 

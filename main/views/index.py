@@ -1,42 +1,36 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import (
     Count,
-    Q,
-    Sum,
     Avg,
-    ExpressionWrapper,
+    Sum,
+    OuterRef,
+    Subquery,
+    Window,
     F,
-    Case,
     When,
+    Case,
+    Value,
     Exists,
+    ExpressionWrapper,
+    FloatField,
+    IntegerField,
 )
-from django.db.models import FloatField
-from django.db.models import Subquery, OuterRef, Window
-from django.db.models import Value
-from django.db.models.functions import Now, ExtractYear, TruncDate
 from django.db.models.functions import (
     RowNumber,
-    Cast,
-    Lower,
-    Upper,
-    Length,
     Coalesce,
     Concat,
+    Length,
+    Upper,
+    Lower,
+    Cast,
+    TruncDate,
+    ExtractYear,
+    Now,
 )
-from django.forms import IntegerField
-from django.utils.translation import gettext_lazy as _
-from django.views.generic import TemplateView, UpdateView, ListView, CreateView
-from rest_framework import viewsets
-from rest_framework.generics import ListAPIView
-from rest_framework.response import Response
-from rest_framework.views import APIView
+from django.views.generic import TemplateView
 
-from .forms import CocktailForm, ImageForm
-from .models import Cocktail, CocktailIngredient, Tag
-from .serializers.cocktail import CocktailSerializer
-from .serializers.cocktail_ingredient_count import IngredientCountSerializer
+from main.models import Cocktail, CocktailIngredient
 
 
 class IndexView(TemplateView):
@@ -58,14 +52,14 @@ class IndexView(TemplateView):
         # Q: Utilisé pour les recherches complexes.
         # This will return all cocktails that have titles containing either "rum" or "gin".
         # Cette requête renverra tous les cocktails dont les titres contiennent soit "rum", soit "gin".
-        cocktails = Cocktail.objects.filter(
-            Q(title__icontains="rum") | Q(title__icontains="gin")
-        )
+        # cocktails = Cocktail.objects.filter(
+        #     Q(title__icontains="rum") | Q(title__icontains="gin")
+        # )
 
         # Prefetch: Optimise la récupération des objets associés.
         # This will get all cocktails and their related ingredients in a single database query.
         # Cela récupère tous les cocktails et leurs ingrédients associés en une seule requête à la base de données.
-        cocktails = Cocktail.objects.all().prefetch_related("ingredients")
+        # cocktails = Cocktail.objects.all().prefetch_related("ingredients")
 
         # Subquery: Intègre une sous-requête dans un QuerySet.
         # This will annotate each user with the title of a cocktail they created.
@@ -239,158 +233,3 @@ class IndexView(TemplateView):
             )
 
         return result
-
-
-class CocktailViewSet(viewsets.ModelViewSet):
-    queryset = Cocktail.objects.all()
-    serializer_class = CocktailSerializer
-
-
-class CocktailListByTitleView(ListAPIView):
-    serializer_class = CocktailSerializer
-
-    def get_queryset(self):
-        title = self.kwargs["title"]
-        return Cocktail.objects.filter(title__icontains=title)
-
-
-class CocktailCreateView(LoginRequiredMixin, CreateView):
-    form_class = CocktailForm
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs.update({"request": self.request})
-        return kwargs
-
-    def get_success_url(self):
-        messages.add_message(
-            self.request, messages.INFO, message="Cocktail créé !"
-        )
-        return reverse("index")
-
-    template_name = "crudl/cocktail/create.html"
-
-
-class CocktailUpdateView(UpdateView):
-    model = Cocktail
-    template_name = "cocktail_update.html"
-    success_url = "/drf/"
-
-    def get_form(self, form_class=None):
-        return CocktailForm(request=self.request)
-
-    def form_invalid(self, form):
-        return super().form_invalid(form)
-
-    def form_valid(self, form):
-        image_form = ImageForm(
-            {
-                "created_by": self.request.user,
-                "updated_by": self.request.user,
-                "title": self.request.POST.get("image_title"),
-            },
-            self.request.FILES,
-        )
-
-        if image_form.is_valid():
-            image = image_form.save()
-            self.object.images.add(image)
-
-        return super().form_valid(form)
-
-
-class CocktailListByIngredientView(APIView):
-    @staticmethod
-    def get(request):
-        ingredient_part = request.query_params.get("ingredient", None)
-        if ingredient_part:
-            serializer = CocktailSerializer(
-                Cocktail.objects.filter(
-                    id__in=CocktailIngredient.objects.filter(
-                        Q(ingredient__name_singular__contains=ingredient_part)
-                        | Q(ingredient__name_plural__contains=ingredient_part)
-                    ).values("cocktail")
-                ),
-                many=True,
-            )
-            return Response(serializer.data)
-        else:
-            return Response(
-                {"message": _("Please provide an ingredient name.")}
-            )
-
-
-class CocktailsByIngredientCountView(ListAPIView):
-    serializer_class = CocktailSerializer
-
-    def get_queryset(self):
-        ingredient_count = int(self.kwargs["count"])
-        cocktails = Cocktail.objects.annotate(
-            ingredient_count=Count("ingredients")
-        ).filter(ingredient_count=ingredient_count)
-        return cocktails
-
-
-class CocktailsByTagView(ListAPIView):
-    serializer_class = CocktailSerializer
-
-    def get_queryset(self):
-        tag_name = self.kwargs["tag"]
-        tag = Tag.objects.get(name=tag_name)
-        return Cocktail.objects.filter(tags=tag)
-
-
-class CocktailWithTagAndMinIngredientsView(ListAPIView):
-    serializer_class = CocktailSerializer
-
-    def get_queryset(self):
-        tag_name = self.kwargs["tag"]
-        min_ingredients = int(self.kwargs["min"])
-        tag = Tag.objects.get(name=tag_name)
-        cocktails = Cocktail.objects.annotate(
-            ingredient_count=Count("ingredients")
-        ).filter(ingredient_count__gte=min_ingredients, tags=tag)
-        return cocktails
-
-
-class CocktailIngredientCountView(APIView):
-    def get(self, request):
-        data = (
-            CocktailIngredient.objects.values("ingredient__name_singular")
-            .annotate(count=Count("cocktail"))
-            .order_by("-count")
-        )
-        serializer = IngredientCountSerializer(data, many=True)
-        return Response(serializer.data)
-
-
-class CocktailWith2IngredientsListView(ListView):
-    template_name = "crudl/cocktail/list.html"
-
-    def get_context_data(self, *, object_list=None, **kwargs):
-        result = super().get_context_data(**kwargs)
-
-        ing1 = self.kwargs["ing1"]
-        ing2 = self.kwargs["ing2"]
-        result["title"] = "Liste des cocktails qui contiennent {} ou {}".format(
-            ing1, ing2
-        )
-        return result
-
-    def get_queryset(self):
-        ing1 = self.kwargs["ing1"]
-        ing2 = self.kwargs["ing2"]
-        return (
-            Cocktail.objects.prefetch_related("ingredients__ingredient")
-            .prefetch_related("ingredients__quantity")
-            .prefetch_related("ingredients__unit")
-            .filter(
-                Q(ingredients__ingredient__name_singular__icontains=ing1)
-                | Q(ingredients__ingredient__name_plural__icontains=ing1)
-            )
-            .filter(
-                Q(ingredients__ingredient__name_singular__icontains=ing2)
-                | Q(ingredients__ingredient__name_plural__icontains=ing2)
-            )
-            .distinct()
-        )

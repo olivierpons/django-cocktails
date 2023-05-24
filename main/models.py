@@ -32,7 +32,7 @@ class TimeStampedModel(models.Model):
         days, seconds = diff.days, diff.seconds
         hours = seconds // 3600
         minutes = (seconds % 3600) // 60
-        seconds = (seconds % 60)
+        seconds = seconds % 60
 
         # Créer une liste vide pour stocker les parties du résultat
         result = []
@@ -66,12 +66,16 @@ class TimeStampedModel(models.Model):
 
 
 def _path(instance, filename):
-    return '{}/{}'.format(timezone.now().strftime('%Y-%m-%d'), filename)
+    return "{}/{}".format(timezone.now().strftime("%Y-%m-%d"), filename)
 
 
 class Image(TimeStampedModel):
-    file = models.ImageField(upload_to=_path, default=None, null=True, blank=True)
-    title = models.CharField(max_length=200, default=None, null=True, blank=True)
+    file = models.ImageField(
+        upload_to=_path, default=None, null=True, blank=True
+    )
+    title = models.CharField(
+        max_length=200, default=None, null=True, blank=True
+    )
 
     def __str__(self):
         return self.title
@@ -150,7 +154,7 @@ class Cocktail(TimeStampedModel):
 
 class CocktailIngredient(TimeStampedModel):
     cocktail = models.ForeignKey(
-        Cocktail, on_delete=models.CASCADE, related_name='ingredients'
+        Cocktail, on_delete=models.CASCADE, related_name="ingredients"
     )
     ingredient = models.ForeignKey(
         Ingredient, on_delete=models.CASCADE, default=None

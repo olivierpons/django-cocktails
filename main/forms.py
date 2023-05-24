@@ -10,8 +10,8 @@ class ImageForm(forms.ModelForm):
 
 class CocktailForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
-        if 'request' in kwargs:
-            self.request = kwargs.pop('request')
+        if "request" in kwargs:
+            self.request = kwargs.pop("request")
         else:
             self.request = None
         super().__init__(*args, **kwargs)
@@ -21,7 +21,7 @@ class CocktailForm(forms.ModelForm):
 
     class Meta:
         model = Cocktail
-        fields = ('title', )
+        fields = ("title",)
 
     def save(self, commit=True):
         self.instance.created_by = self.request.user

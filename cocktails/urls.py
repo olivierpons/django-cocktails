@@ -4,17 +4,17 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from main.views import (
-    IndexView,
-    CocktailViewSet,
-    CocktailListByIngredientView,
-    CocktailListByTitleView,
-    CocktailUpdateView,
-    CocktailsByIngredientCountView,
-    CocktailsByTagView,
-    CocktailWithTagAndMinIngredientsView,
-    CocktailIngredientCountView, CocktailWith2IngredientsListView, CocktailCreateView,
-)
+from main.views.cocktails.create import CocktailCreateView
+from main.views.cocktails.list_with_2_ingredients import CocktailWith2IngredientsListView
+from main.views.cocktails.update import CocktailUpdateView
+from main.views.index import IndexView
+from main.views.json.cocktails.ingredient_count import CocktailIngredientCountView
+from main.views.json.cocktails.list_by_ingredient import CocktailListByIngredientView
+from main.views.json.cocktails.list_by_ingredient_count import CocktailsByIngredientCountView
+from main.views.json.cocktails.list_by_tag import CocktailsByTagView
+from main.views.json.cocktails.list_by_title import CocktailListByTitleView
+from main.views.json.cocktails.list_with_tag_and_min_ingredients import CocktailWithTagAndMinIngredientsView
+from main.views.json.cocktails.view_set import CocktailViewSet
 
 router = DefaultRouter()
 router.register(r"cocktails", CocktailViewSet)
@@ -97,7 +97,7 @@ urlpatterns = [
 
     path(
         "cocktail-with-2-ingredients/<str:ing1>/<str:ing2>",
-        CocktailWith2IngredientsListView.as_view(),
+            CocktailWith2IngredientsListView.as_view(),
         name="cocktail-with-2-ingredients",
     ),
 
