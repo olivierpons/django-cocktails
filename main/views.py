@@ -1,3 +1,4 @@
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import (
@@ -26,7 +27,7 @@ from django.db.models.functions import (
 )
 from django.forms import IntegerField
 from django.utils.translation import gettext_lazy as _
-from django.views.generic import TemplateView, UpdateView
+from django.views.generic import TemplateView, UpdateView, ListView, CreateView
 from rest_framework import viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -153,7 +154,6 @@ class IndexView(TemplateView):
         has_created_cocktails = Exists(
             Cocktail.objects.filter(created_by=self.request.user)
         )
-
         # ExpressionWrapper: Utilisé pour envelopper les expressions complexes.
         # Used to wrap complex expressions.
         # Dans cet exemple, il est utilisé pour calculer le carré de la valeur de la quantité.
@@ -254,11 +254,30 @@ class CocktailListByTitleView(ListAPIView):
         return Cocktail.objects.filter(title__icontains=title)
 
 
+class CocktailCreateView(LoginRequiredMixin, CreateView):
+    form_class = CocktailForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({"request": self.request})
+        return kwargs
+
+    def get_success_url(self):
+        messages.add_message(
+            self.request, messages.INFO, message="Cocktail créé !"
+        )
+        return reverse("index")
+
+    template_name = "crudl/cocktail/create.html"
+
+
 class CocktailUpdateView(UpdateView):
     model = Cocktail
-    form_class = CocktailForm
     template_name = "cocktail_update.html"
     success_url = "/drf/"
+
+    def get_form(self, form_class=None):
+        return CocktailForm(request=self.request)
 
     def form_invalid(self, form):
         return super().form_invalid(form)
@@ -343,3 +362,35 @@ class CocktailIngredientCountView(APIView):
         )
         serializer = IngredientCountSerializer(data, many=True)
         return Response(serializer.data)
+
+
+class CocktailWith2IngredientsListView(ListView):
+    template_name = "crudl/cocktail/list.html"
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        result = super().get_context_data(**kwargs)
+
+        ing1 = self.kwargs["ing1"]
+        ing2 = self.kwargs["ing2"]
+        result["title"] = "Liste des cocktails qui contiennent {} ou {}".format(
+            ing1, ing2
+        )
+        return result
+
+    def get_queryset(self):
+        ing1 = self.kwargs["ing1"]
+        ing2 = self.kwargs["ing2"]
+        return (
+            Cocktail.objects.prefetch_related("ingredients__ingredient")
+            .prefetch_related("ingredients__quantity")
+            .prefetch_related("ingredients__unit")
+            .filter(
+                Q(ingredients__ingredient__name_singular__icontains=ing1)
+                | Q(ingredients__ingredient__name_plural__icontains=ing1)
+            )
+            .filter(
+                Q(ingredients__ingredient__name_singular__icontains=ing2)
+                | Q(ingredients__ingredient__name_plural__icontains=ing2)
+            )
+            .distinct()
+        )

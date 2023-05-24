@@ -19,6 +19,7 @@ SECRET_KEY = "django-insecure-nw7-td34p@y^gz3mq2cuh=7b)ak3=odb^4+1bj&kv&q1gn6q3-
 DEBUG = True
 
 ALLOWED_HOSTS = []
+INTERNAL_IPS = ("127.0.0.1", )
 
 # Application definition
 
@@ -31,9 +32,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     'main.apps.MainConfig',
     'rest_framework',
+    "debug_toolbar",
 ]
 
 MIDDLEWARE = [
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     # ! multilanguage: between SessionMiddleware and CommonMiddleware
@@ -108,6 +111,8 @@ STATIC_URL = "static/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
+
+STATICFILES_DIRS = (BASE_DIR / "static", )
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

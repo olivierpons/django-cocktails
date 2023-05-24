@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block main-content %}
+    {% if title %}
+        <h1>{{ title }}</h1>
+    {% endif %}
+
+    {% for object in object_list %}
+        {{ object.title }} :
+        <ul>
+            {% for ingredient in object.ingredients.all %}
+                <li>{{ ingredient }}</li>
+            {% endfor %}
+        </ul>
+
+    {% endfor %}
+
+{% endblock %}

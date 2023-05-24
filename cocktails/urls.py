@@ -13,13 +13,16 @@ from main.views import (
     CocktailsByIngredientCountView,
     CocktailsByTagView,
     CocktailWithTagAndMinIngredientsView,
-    CocktailIngredientCountView,
+    CocktailIngredientCountView, CocktailWith2IngredientsListView, CocktailCreateView,
 )
 
 router = DefaultRouter()
 router.register(r"cocktails", CocktailViewSet)
 
 urlpatterns = [
+    path('__debug__/', include('debug_toolbar.urls')),
+
+    # region "urls"
     path("admin/", admin.site.urls),
     path("api-auth/", include("rest_framework.urls")),
     path("drf/", include(router.urls)),
@@ -29,6 +32,9 @@ urlpatterns = [
         name="cocktail_search",
     ),
     path("cocktails-by-title/<str:title>/", CocktailListByTitleView.as_view()),
+    path(
+        "cocktails/create", CocktailCreateView.as_view(), name="cocktail_create"
+    ),
     path(
         "cocktail-update/<int:pk>/",
         CocktailUpdateView.as_view(),
@@ -88,6 +94,14 @@ urlpatterns = [
     # </html>
     # """
     path("", IndexView.as_view(), name="index"),
+
+    path(
+        "cocktail-with-2-ingredients/<str:ing1>/<str:ing2>",
+        CocktailWith2IngredientsListView.as_view(),
+        name="cocktail-with-2-ingredients",
+    ),
+
+
 ]
 
 if settings.DEBUG:

@@ -1,0 +1,16 @@
+{% load klass %}
+{{ f.label }}
+{% if f.field.widget|klass == 'CheckboxInput' %}
+    {{ f }}
+{% elif f|klass == 'img' %}
+    {{ f }}
+{% else %}
+    {{ f }}
+{% endif %}
+{% if f.errors %}
+    <ul>
+        {% for error in f.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
